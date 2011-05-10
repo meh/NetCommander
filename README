@@ -1,0 +1,16 @@
+NetCommander 1.0 - An easy to use arp spoofing tool.
+Copyleft Simone Margaritelli <evilsocket@gmail.com>
+http://www.evilsocket.net
+http://www.backbox.org
+
+Usage: netcmd.py [options]
+
+Options:
+  -h, --help            show this help message and exit
+  -I IFACE, --iface=IFACE
+                        Network interface to use.
+  -K, --kill            Kill target connections instead of forward them.
+  -D DELAY, --delay=DELAY
+                        Delay in seconds between one arp packet and another,
+                        default is 1.
+
