@@ -24,6 +24,7 @@ import os
 import sys
 import atexit
 from optparse import OptionParser
+from socket import gethostbyaddr
 
 # disable scapy warnings about ipv6 and shit like that
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
@@ -46,6 +47,28 @@ class NetCmd:
     fd = open( '/proc/sys/net/ipv4/ip_forward', 'w+' )
     fd.write( '1' if status == True else '0' )
     fd.close()
+
+  def find_alive_hosts( self ):
+    self.gateway_hw = None
+    self.endpoints  = []
+    
+    print "@ Searching for alive network endpoints ..."
+
+    # broadcast arping ftw
+    ans,unans = srp( Ether( dst = "ff:ff:ff:ff:ff:ff" ) / ARP( pdst = self.network ), 
+                     verbose = False, 
+                     filter  = "arp and arp[7] = 2", 
+                     timeout = 2, 
+                     iface_hint = self.network )
+
+    for snd,rcv in ans:
+      if rcv.psrc == self.gateway:
+        self.gateway_hw = rcv.hwsrc
+      else:
+        self.endpoints.append( ( rcv.hwsrc, rcv.psrc ) )
+      
+    if self.endpoints == []:
+      raise Exception( "Could not find any network alive endpoint." )
 
   def __init__( self, interface, kill = False ):
     # scapy, you're pretty cool ... but shut the fuck up bitch!
@@ -82,23 +105,7 @@ class NetCmd:
     else:
       raise Exception( "Could not find any network gateway." )
 
-    print "@ Searching for alive network endpoints ..."
-
-    # broadcast arping ftw
-    ans,unans = srp( Ether( dst = "ff:ff:ff:ff:ff:ff" ) / ARP( pdst = self.network ), 
-                     verbose = False, 
-                     filter  = "arp and arp[7] = 2", 
-                     timeout = 2, 
-                     iface_hint = self.network )
-
-    for snd,rcv in ans:
-      if rcv.psrc == self.gateway:
-        self.gateway_hw = rcv.hwsrc
-      else:
-        self.endpoints.append( ( rcv.hwsrc, rcv.psrc ) )
-      
-    if self.endpoints == []:
-      raise Exception( "Could not find any network alive endpoint." )
+    self.find_alive_hosts()
 
     print "@ Please choose your target :"
     choice = None
@@ -106,11 +113,14 @@ class NetCmd:
     while choice is None:
       for i, item in enumerate( self.endpoints ):
         print "  [%d] %s %s" % ( i, item[0], item[1] )
-      choice = raw_input( "@ Choose [0-%d] (* to select all): " % (len(self.endpoints) - 1) )
+      choice = raw_input( "@ Choose [0-%d] (* to select all, r to refresh): " % (len(self.endpoints) - 1) )
       try:
         choice = choice.strip()
         if choice == '*':
           self.targets = self.endpoints
+        elif choice.lower() == 'r':
+          choice = None
+          self.find_alive_hosts()
         else:
           self.targets.append( self.endpoints[ int(choice) ] )
       except Exception as e:
