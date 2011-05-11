@@ -24,7 +24,6 @@ import os
 import sys
 import atexit
 from optparse import OptionParser
-from socket import gethostbyaddr
 
 # disable scapy warnings about ipv6 and shit like that
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
@@ -154,14 +153,11 @@ try:
          
   parser = OptionParser( usage = "usage: %prog [options]" )
 
-  parser.add_option( "-I", "--iface", action="store",      dest="iface", default=None,  help="Network interface to use." );
-  parser.add_option( "-K", "--kill",  action="store_true", dest="kill",  default=False, help="Kill targets connections instead of forwarding them." )
-  parser.add_option( "-D", "--delay", action="store",      dest="delay", default=5,     help="Delay in seconds between one arp packet and another, default is 5." )
+  parser.add_option( "-I", "--iface", action="store",      dest="iface", default=conf.iface, help="Network interface to use if different from the default one." );
+  parser.add_option( "-K", "--kill",  action="store_true", dest="kill",  default=False,      help="Kill targets connections instead of forwarding them." )
+  parser.add_option( "-D", "--delay", action="store",      dest="delay", default=5,          help="Delay in seconds between one arp packet and another, default is 5." )
   
   (o,args) = parser.parse_args()
-  
-  if o.iface is None:
-    parser.error( "No interface specified, use -h or --help for the help menu." )
 
   ncmd = NetCmd( o.iface, o.kill )
   
