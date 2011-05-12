@@ -144,9 +144,9 @@ class NetCmd:
       print "@ Disabling ipv4 forwarding system wide to kill target connections ..."
       self.__set_forwarding( False )
     
-    atexit.register( self.restore )
+    atexit.register( self.restore_cache )
     
-  def restore( self ):
+  def restore_cache( self ):
     os.write( 1, "@ Restoring ARP cache " )
     for i in range(5):
       for packet in self.restore:
@@ -162,7 +162,7 @@ class NetCmd:
       sendp( packet, iface_hint = self.gateway )
 
 try:
-  print "\n\tNetCommander 1.1 - An easy to use arp spoofing tool.\n \
+  print "\n\tNetCommander 1.2 - An easy to use arp spoofing tool.\n \
 \tCopyleft Simone Margaritelli <evilsocket@gmail.com>\n \
 \thttp://www.evilsocket.net\n\thttp://www.backbox.org\n";
          
@@ -187,7 +187,6 @@ try:
     time.sleep( o.delay )
 
 except KeyboardInterrupt:
-  print "\n@ Bye ^^"
-
+  pass
 except Exception as e:
   print "@ ERROR : %s" % e 
