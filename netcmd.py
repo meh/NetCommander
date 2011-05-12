@@ -179,7 +179,7 @@ try:
   if not o.kill:
     os.write( 1, "@ Spoofing, launch your preferred network sniffer to see target traffic " )
   else:
-    os.write( 1, "@ Killing target connections, wait a for a few packets to be sent and then quit with CTRL+C " )
+    os.write( 1, "@ Killing target connections " )
 
   while 1:
     ncmd.spoof()
