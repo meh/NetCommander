@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#! /usr/bin/env python2
 # This file is part of NetCommander.
 #
 # Copyright(c) 2010-2011 Simone Margaritelli
