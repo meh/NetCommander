@@ -22,6 +22,7 @@ import logging
 import time
 import os
 import sys
+import traceback
 import atexit
 from optparse import OptionParser
 
@@ -171,6 +172,7 @@ try:
   parser.add_option( "-I", "--iface", action="store",      dest="iface", default=conf.iface, help="Network interface to use if different from the default one." );
   parser.add_option( "-K", "--kill",  action="store_true", dest="kill",  default=False,      help="Kill targets connections instead of forwarding them." )
   parser.add_option( "-D", "--delay", action="store",      dest="delay", default=5,          help="Delay in seconds between one arp packet and another, default is 5." )
+  parser.add_option( "-d", "--debug", action="store_true", dest="debug", default=False,      help="Set the debug mode." )
   
   (o,args) = parser.parse_args()
 
@@ -190,3 +192,7 @@ except KeyboardInterrupt:
   pass
 except Exception as e:
   print "@ ERROR : %s" % e 
+
+  if o.debug:
+    print ""
+    traceback.print_exc( file=sys.stderr )
