@@ -70,14 +70,14 @@ class NetCmd:
     if self.endpoints == []:
       raise Exception( "Could not find any network alive endpoint." )
 
-  def __init__( self, interface, kill = False ):
+  def __init__( self, interface, gateway = None, network = None, kill = False ):
     # scapy, you're pretty cool ... but shut the fuck up bitch!
     conf.verb = 0
 
     self.interface  = interface
-    self.network    = None
+    self.network    = network
     self.targets    = [] 
-    self.gateway    = None
+    self.gateway    = gateway
     self.gateway_hw = None
     self.packets    = []
     self.restore    = []
@@ -98,7 +98,7 @@ class NetCmd:
           bits = self.__bit_count( msk )
           self.network = "%s/%d" % ( net, bits )
         # search for a valid network gateway
-        if route[2] != '0.0.0.0':
+        if self.gateway is None and route[2] != '0.0.0.0':
           self.gateway = route[2]
     
     if self.gateway is not None and self.network is not None:
@@ -169,14 +169,16 @@ try:
          
   parser = OptionParser( usage = "usage: %prog [options]" )
 
-  parser.add_option( "-I", "--iface", action="store",      dest="iface", default=conf.iface, help="Network interface to use if different from the default one." );
-  parser.add_option( "-K", "--kill",  action="store_true", dest="kill",  default=False,      help="Kill targets connections instead of forwarding them." )
-  parser.add_option( "-D", "--delay", action="store",      dest="delay", default=5,          help="Delay in seconds between one arp packet and another, default is 5." )
+  parser.add_option( "-I", "--iface",   action="store",      dest="iface",   default=conf.iface, help="Network interface to use if different from the default one." );
+  parser.add_option( "-N", "--network", action="store",      dest="network", default=None,       help="Network to work on." );
+  parser.add_option( "-G", "--gateway", action="store",      dest="gateway", default=None,       help="Gateway to use." );
+  parser.add_option( "-K", "--kill",    action="store_true", dest="kill",    default=False,      help="Kill targets connections instead of forwarding them." )
+  parser.add_option( "-D", "--delay",   action="store",      dest="delay",   default=5,          help="Delay in seconds between one arp packet and another, default is 5." )
   parser.add_option( "-d", "--debug", action="store_true", dest="debug", default=False,      help="Set the debug mode." )
   
   (o,args) = parser.parse_args()
 
-  ncmd = NetCmd( o.iface, o.kill )
+  ncmd = NetCmd( o.iface, o.gateway, o.network, o.kill )
   
   if not o.kill:
     os.write( 1, "@ Spoofing, launch your preferred network sniffer to see target traffic " )
